@@ -56,6 +56,15 @@ jobs:
             exit 1
           fi
 
+      - name: Extract Facebook version from IPA
+        run: |
+          unzip -q facebook.ipa -d fb_tmp
+          PLIST_PATH=$(find fb_tmp/Payload/*.app -name "Info.plist" -maxdepth 1 | head -1)
+          FB_VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$PLIST_PATH")
+          echo "FB_VERSION=$FB_VERSION" >> $GITHUB_ENV
+          echo "Detected Facebook version: $FB_VERSION"
+          rm -rf fb_tmp
+
       - name: Install Dependencies
         run: brew install make ldid
 
@@ -88,24 +97,30 @@ jobs:
           echo "Downloading: $deb_url"
           wget "$deb_url" --no-verbose -O ${{ github.workspace }}/glow_fb.deb
 
+      - name: Set output filename
+        run: |
+          OUTPUT_NAME="Facebook_v${{ env.FB_VERSION }}_Glow_${{ env.GLOW_TAG }}"
+          echo "OUTPUT_NAME=$OUTPUT_NAME" >> $GITHUB_ENV
+          echo "Output filename: $OUTPUT_NAME"
+
       - name: Inject tweaks into IPA
-        run: cyan -i facebook.ipa -o Glow_FB_${{ env.GLOW_TAG }}.ipa -uwef glow_fb.deb -n "${{ inputs.display_name }}" -b ${{ inputs.bundle_id }} -s
+        run: cyan -i facebook.ipa -o ${{ env.OUTPUT_NAME }}.ipa -uwef glow_fb.deb -n "${{ inputs.display_name }}" -b ${{ inputs.bundle_id }} -s
 
       - name: Strip embedded Swift dylibs
         run: |
-          unzip -q Glow_FB_${{ env.GLOW_TAG }}.ipa -d tmp_payload
+          unzip -q ${{ env.OUTPUT_NAME }}.ipa -d tmp_payload
           find tmp_payload/Payload/*.app/ -name "libswift*.dylib" -print -delete
           cd tmp_payload
-          zip -qr ../Glow_FB_${{ env.GLOW_TAG }}_clean.ipa Payload
+          zip -qr ../${{ env.OUTPUT_NAME }}_clean.ipa Payload
           cd ..
-          mv Glow_FB_${{ env.GLOW_TAG }}_clean.ipa Glow_FB_${{ env.GLOW_TAG }}.ipa
+          mv ${{ env.OUTPUT_NAME }}_clean.ipa ${{ env.OUTPUT_NAME }}.ipa
 
       - uses: softprops/action-gh-release@v2.0.1
         with:
-          tag_name: glow-fb-${{ env.GLOW_TAG }}
-          name: Glow_FB ${{ env.GLOW_TAG }}
-          files: Glow_FB_${{ env.GLOW_TAG }}.ipa
-          draft: true
+          tag_name: ${{ env.OUTPUT_NAME }}
+          name: ${{ env.OUTPUT_NAME }}
+          files: ${{ env.OUTPUT_NAME }}.ipa
+          draft: false
 
       - name: Output Release URL
         run: |
