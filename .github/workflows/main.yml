@@ -34,14 +34,37 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
-        with:
-          path: main
-          submodules: recursive
 
       - name: Hide sensitive inputs
         uses: levibostian/action-hide-sensitive-inputs@v1
         with:
           exclude_inputs: display_name,bundle_id
+
+      # -------------------------
+      # Cache Homebrew
+      # -------------------------
+      - name: Cache Homebrew
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/Homebrew
+            /opt/homebrew/Cellar
+          key: brew-${{ runner.os }}-${{ hashFiles('**/Brewfile') }}
+          restore-keys: |
+            brew-${{ runner.os }}-
+
+      # -------------------------
+      # Cache pipx
+      # -------------------------
+      - name: Cache pipx
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/pipx
+            ~/.cache/pip
+          key: pipx-${{ runner.os }}-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            pipx-${{ runner.os }}-
 
       - name: Download and validate IPA
         run: |
@@ -74,7 +97,8 @@ jobs:
         run: echo "$(brew --prefix make)/libexec/gnubin" >> $GITHUB_PATH
 
       - name: Install cyan (pyzule)
-        run: pipx install --force https://github.com/asdfzxcvbn/pyzule-rw/archive/main.zip
+        run: |
+          pipx install --force https://github.com/asdfzxcvbn/pyzule-rw/archive/main.zip
 
       - name: Download Glow tweak
         env:
@@ -82,7 +106,6 @@ jobs:
         run: |
           api_url="https://api.github.com/repos/dayanch96/Glow/releases/latest"
 
-          # Warm up API (avoids occasional rate/permission quirks)
           curl -s -H "Authorization: Bearer $GITHUB_TOKEN" "$api_url" > /dev/null
 
           response=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" "$api_url")
@@ -104,7 +127,6 @@ jobs:
         run: |
           OUTPUT_NAME="Facebook_v${{ env.FB_VERSION }}_Glow_${{ env.GLOW_TAG }}"
           echo "OUTPUT_NAME=$OUTPUT_NAME" >> $GITHUB_ENV
-          echo "Output: $OUTPUT_NAME"
 
       - name: Inject tweaks into IPA
         run: |
@@ -119,7 +141,6 @@ jobs:
         run: |
           unzip -q "${{ env.OUTPUT_NAME }}.ipa" -d tmp_payload
 
-          # Remove unnecessary Swift runtime libraries
           find tmp_payload/Payload/*.app/ -name "libswift*.dylib" -print -delete
 
           cd tmp_payload
@@ -137,14 +158,11 @@ jobs:
 
           echo "Processing release: $TAG"
 
-          # Check if release already exists
           if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "Release exists. Uploading asset (overwrite if needed)..."
-
+            echo "Release exists. Uploading asset (overwrite)..."
             gh release upload "$TAG" "$FILE" --clobber
           else
-            echo "Release does not exist. Creating new release..."
-
+            echo "Creating new release..."
             gh release create "$TAG" "$FILE" \
               --title "$TAG" \
               --notes "Auto-generated release"
