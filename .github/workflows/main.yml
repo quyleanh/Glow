@@ -44,20 +44,20 @@ jobs:
       # Cache Homebrew
       # -------------------------
       - name: Cache Homebrew
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/Library/Caches/Homebrew
             /opt/homebrew/Cellar
-          key: brew-${{ runner.os }}-${{ hashFiles('**/Brewfile') }}
+          key: brew-${{ runner.os }}-${{ hashFiles('.github/workflows/*.yml') }}
           restore-keys: |
             brew-${{ runner.os }}-
-
+      
       # -------------------------
       # Cache pipx
       # -------------------------
       - name: Cache pipx
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.local/pipx
@@ -91,7 +91,16 @@ jobs:
 
       - name: Install dependencies
         run: |
-          brew install make ldid
+          if ! brew list make >/dev/null 2>&1; then
+            brew install make
+          fi
+      
+          if ! brew list ldid >/dev/null 2>&1; then
+            brew install ldid
+          fi
+      
+          brew link --overwrite make || true
+          brew link --overwrite ldid || true
 
       - name: Set GNU make in PATH
         run: echo "$(brew --prefix make)/libexec/gnubin" >> $GITHUB_PATH
