@@ -50,7 +50,7 @@
 "DownloadingAudio" = "Pobieranie audio";
 "Slow" = "Wymaga ponownego przetwarzania";
 "Fast" = "Bardzo szybkie";
-"MergingMedia" = "Łączenie plikóe";
+"MergingMedia" = "Łączenie plików";
 "WaitsForConversion" = "Zakolejkowano do konwersji";
 "Error.Clipboard" = "Error. Sprawdź logi w schowku";
 "Cancel" = "Anuluj";
